@@ -651,6 +651,8 @@
       bgMode: "solid",
       waveformData: null,
       animFrame: null,
+      beatPulse: 0,
+      beatHist: [],
     };
 
     const canvas = $("#waveform-canvas");
@@ -1107,12 +1109,45 @@
       return `hsl(${Math.round(hh)}, 100%, 65%)`;
     }
 
+    // Gedeelde beat-status voor dit frame (wordt per drawNeonWaves gezet)
+    const neonDyn = { bass: 0, mid: 0, high: 0, level: 0.55, pulse: 0, td: null, live: false };
+
+    function neonBands(freqData) {
+      if (!freqData || freqData.length === 0) return { bass: 0, mid: 0, high: 0, level: 0.55 };
+      const n = freqData.length;
+      const avg = (a, b) => {
+        a = Math.max(0, a); b = Math.min(n, b);
+        if (b <= a) return 0;
+        let s = 0;
+        for (let i = a; i < b; i++) s += freqData[i];
+        return (s / (b - a)) / 255;
+      };
+      // fftSize 2048 -> ~21.5Hz per bin: bas ~40-300Hz, mid ~300-2.5kHz, hoog daarboven
+      const bass = Math.min(1, avg(2, 14) * 2.2);
+      const mid = Math.min(1, avg(14, 120) * 1.8);
+      const high = Math.min(1, avg(120, 420) * 2.4);
+      const level = Math.min(1, bass * 0.55 + mid * 0.3 + high * 0.15);
+      return { bass, mid, high, level };
+    }
+
+    function updateBeat(bass) {
+      const hist = state.beatHist;
+      hist.push(bass);
+      if (hist.length > 32) hist.shift();
+      const avg = hist.reduce((a, b) => a + b, 0) / Math.max(1, hist.length);
+      // Onset: bas duidelijk boven recent gemiddelde -> pulse omhoog
+      if (bass > avg * 1.28 + 0.04 && bass > 0.22) {
+        state.beatPulse = Math.min(1.2, state.beatPulse + (bass - avg) * 2.4 + 0.25);
+      }
+      // Snelle attack, vloeiende decay zodat het echt "pompt"
+      state.beatPulse *= 0.93;
+      if (state.beatPulse < 0.01) state.beatPulse = 0;
+      return state.beatPulse;
+    }
+
     function neonEnergy(freqData) {
       if (!freqData || freqData.length === 0) return 0.55;
-      let sum = 0;
-      const n = Math.min(freqData.length, 200);
-      for (let i = 0; i < n; i++) sum += freqData[i];
-      return Math.min(1, (sum / n / 255) * 1.6);
+      return neonBands(freqData).level;
     }
 
     function neonY(x, w, h, data, energy, t, layer) {
@@ -1121,19 +1156,30 @@
       const nx = x / w;
       // 0 aan de randen, 1 in het midden -> lijnen komen samen aan de zijkanten zoals plaatje
       const env = Math.pow(Math.sin(Math.PI * Math.min(1, Math.max(0, nx))), 1.6);
-      const amp = h * 0.30 * (0.35 + energy * 0.9);
-      // Draaggolf: paar nuldoorgangen over de breedte, langzaam animerend
+      const pulse = neonDyn.pulse || 0;
+      const bass = neonDyn.bass || 0;
+      const pump = neonDyn.live ? 1 + pulse * 0.85 + bass * 0.45 : 1;
+      const amp = h * 0.30 * (0.35 + energy * 0.9) * pump;
+      // Draaggolf: paar nuldoorgangen over de breedte; bij live audio sneller + feller
+      const speed = neonDyn.live ? 1.6 : 0.9;
       const ph = layer * 1.35;
       const carrier =
-        Math.sin((nx - 0.12) * 10.5 + t * 0.9 + ph) * 0.52 +
-        Math.sin((nx - 0.38) * 19.0 - t * 1.25 + ph * 1.4) * 0.30 +
-        Math.sin(nx * 36.0 + t * 1.8 + ph * 2.1) * 0.10;
-      // Grote piek (roze, links-midden) en diepe V (cyaan, rechts-midden) zoals screenshot
+        Math.sin((nx - 0.12) * 10.5 + t * speed + ph) * 0.52 +
+        Math.sin((nx - 0.38) * 19.0 - t * speed * 1.35 + ph * 1.4) * 0.30 +
+        Math.sin(nx * 36.0 + t * speed * 2.0 + ph * 2.1) * 0.10;
+      // Echte golfvorm-ripple uit de time-domain data: lijnen trillen mee met de muziek
+      let ripple = 0;
+      if (neonDyn.live && neonDyn.td && neonDyn.td.length > 0) {
+        const ti = Math.min(neonDyn.td.length - 1, Math.floor(nx * neonDyn.td.length));
+        ripple = ((neonDyn.td[ti] || 128) - 128) / 128; // -1..1
+      }
+      // Grote piek (links-midden) en diepe V (rechts-midden); diepte pompt op de beat
       const gauss = (c, s) => Math.exp(-Math.pow((nx - c) / s, 2));
-      const peak = gauss(0.44, 0.085) * 1.05 - gauss(0.30, 0.07) * 0.55;
-      const dipDepth = layer === 1 ? 1.5 : 0.8;
-      const dip = gauss(0.60, 0.065) * dipDepth - gauss(0.74, 0.075) * 0.9;
-      const shape = audioBase * 0.45 + carrier * 0.75 + peak - dip;
+      const beatBoost = neonDyn.live ? 1 + pulse * 1.1 + bass * 0.5 : 1;
+      const peak = (gauss(0.44, 0.085) * 1.05 - gauss(0.30, 0.07) * 0.55) * beatBoost;
+      const dipDepth = (layer === 1 ? 1.5 : 0.8) * beatBoost;
+      const dip = gauss(0.60, 0.065) * dipDepth - gauss(0.74, 0.075) * 0.9 * beatBoost;
+      const shape = audioBase * 0.45 + carrier * 0.75 + peak - dip + ripple * (neonDyn.live ? 0.9 : 0);
       return h * 0.47 + shape * amp * (0.08 + 0.92 * env);
     }
 
@@ -1206,13 +1252,20 @@
     }
 
     function drawNeonWaves(c, w, h, data, time, freqData, timeData) {
-      const t = time * 0.9 + performance.now() / 1000 * 0.12;
-      const energy = freqData ? neonEnergy(freqData) : 0.6;
+      const live = !!(freqData && freqData.length > 0);
+      const bands = live ? neonBands(freqData) : { bass: 0, mid: 0, high: 0, level: 0.6 };
+      const pulse = live ? updateBeat(bands.bass) : (0.25 + 0.25 * Math.sin(performance.now() / 1000 * 1.4));
+      neonDyn.bass = bands.bass; neonDyn.mid = bands.mid; neonDyn.high = bands.high;
+      neonDyn.level = bands.level; neonDyn.pulse = pulse;
+      neonDyn.td = live ? timeData : null; neonDyn.live = live;
+      const t = live ? time * 1.1 + performance.now() / 1000 * 0.05 : time * 0.9 + performance.now() / 1000 * 0.12;
+      const energy = bands.level;
       const [col1, col2] = getNeonColors();
       const col3 = col1;
       const scale = Math.max(0.6, w / 1280);
-      const lw = Math.max(1.4, 2.2 * scale * 0.6 + state.barWidth * 0.30);
-      const glow = Math.min(42, 16 * scale + 10);
+      const pumpW = 1 + pulse * 0.35;
+      const lw = Math.max(1.4, 2.2 * scale * 0.6 + state.barWidth * 0.30) * pumpW;
+      const glow = Math.min(60, (16 * scale + 10) * (1 + pulse * 0.8));
       const floorY = h * 0.70;
 
       // Bijna zwarte achtergrond met subtiele paars/blauwe tint in het midden
@@ -1244,7 +1297,7 @@
 
       // Cyaan lint: gevulde band tussen golf en middenlijn zoals in screenshot
       c.save();
-      c.globalAlpha = 0.20;
+      c.globalAlpha = live ? 0.16 + Math.min(0.22, pulse * 0.22) : 0.20;
       c.fillStyle = col2;
       c.shadowColor = col2;
       c.shadowBlur = glow;
@@ -1315,8 +1368,8 @@
         c.fillStyle = g;
         c.fillRect(sx - w * 0.1, floorY, w * 0.2, h - floorY);
       };
-      spot(0.60, "rgba(34,230,255,0.20)");
-      spot(0.44, "rgba(255,95,210,0.16)");
+      spot(0.60, `rgba(34,230,255,${(live ? 0.16 + Math.min(0.25, pulse * 0.25) : 0.20).toFixed(3)})`);
+      spot(0.44, `rgba(255,95,210,${(live ? 0.12 + Math.min(0.2, pulse * 0.2) : 0.16).toFixed(3)})`);
       c.restore();
 
       // Fade naar zwart onderaan
@@ -1329,7 +1382,8 @@
 
     function drawNeonCtx(c, w, h, data, time, hasLive, freqData, timeData) {
       const fd = hasLive ? freqData : null;
-      drawNeonWaves(c, w, h, data, time, fd, null);
+      const td = hasLive ? timeData : null;
+      drawNeonWaves(c, w, h, data, time, fd, td);
     }
 
     let neonIdleRaf = null;
