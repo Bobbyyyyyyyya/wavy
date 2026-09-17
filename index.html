@@ -274,6 +274,58 @@
       box-shadow: 0 0 0 2px var(--accent);
     }
 
+    .color-custom {
+      width: 32px;
+      height: 32px;
+      border-radius: 8px;
+      cursor: pointer;
+      border: 2px dashed var(--border);
+      padding: 0;
+      background: conic-gradient(#f55, #ff5, #5f5, #5ff, #55f, #f5f, #f55);
+      transition: transform 0.15s, border-color 0.15s;
+    }
+
+    .color-custom:hover {
+      transform: scale(1.1);
+      border-color: var(--accent);
+    }
+
+    .color-custom::-webkit-color-swatch-wrapper {
+      padding: 2px;
+    }
+
+    .color-custom::-webkit-color-swatch {
+      border: none;
+      border-radius: 5px;
+    }
+
+    .bg-image-row {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      margin-top: 8px;
+    }
+
+    .bg-image-btn {
+      flex: 1;
+      background: var(--bg);
+      color: var(--text-dim);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 8px 12px;
+      font-size: 12px;
+      cursor: pointer;
+      transition: border-color 0.15s, color 0.15s;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .bg-image-btn:hover {
+      border-color: var(--accent);
+      color: var(--text);
+    }
+
     select {
       background: var(--bg);
       color: var(--text);
@@ -521,6 +573,34 @@
               <div class="desc">Glowing dual wave + stars</div>
             </div>
           </button>
+          <button class="waveform-option" data-style="particles">
+            <div class="preview-wrap"><canvas class="preview" id="preview-particles" width="128" height="88"></canvas></div>
+            <div>
+              <div class="label">Particles</div>
+              <div class="desc">Dancing particle field</div>
+            </div>
+          </button>
+          <button class="waveform-option" data-style="spiral">
+            <div class="preview-wrap"><canvas class="preview" id="preview-spiral" width="128" height="88"></canvas></div>
+            <div>
+              <div class="label">Spiral</div>
+              <div class="desc">Rotating audio helix</div>
+            </div>
+          </button>
+          <button class="waveform-option" data-style="scope">
+            <div class="preview-wrap"><canvas class="preview" id="preview-scope" width="128" height="88"></canvas></div>
+            <div>
+              <div class="label">Oscilloscope</div>
+              <div class="desc">Retro phosphor scope</div>
+            </div>
+          </button>
+          <button class="waveform-option" data-style="flow">
+            <div class="preview-wrap"><canvas class="preview" id="preview-flow" width="128" height="88"></canvas></div>
+            <div>
+              <div class="label">Gradient Fill</div>
+              <div class="desc">Filled wave, fading glow</div>
+            </div>
+          </button>
         </div>
       </div>
 
@@ -557,6 +637,11 @@
           <div class="color-swatch" style="background:#0d1117" data-color="#0d1117"></div>
           <div class="color-swatch" style="background:#1a0a2e" data-color="#1a0a2e"></div>
           <div class="color-swatch" style="background:#ffffff" data-color="#ffffff"></div>
+          <input type="color" class="color-custom" id="bg-custom" value="#0a0a0f" title="Kies eigen kleur" />
+        </div>
+        <div class="bg-image-row" id="bg-image-row" style="display:none">
+          <button class="bg-image-btn" id="bg-image-btn">Choose image…</button>
+          <input type="file" id="bg-image-input" accept="image/*" style="display:none" />
         </div>
       </div>
 
@@ -569,6 +654,7 @@
           <div class="color-swatch" style="background:#5cfc9c" data-color="#5cfc9c"></div>
           <div class="color-swatch" style="background:#ffc53d" data-color="#ffc53d"></div>
           <div class="color-swatch" style="background:#ffffff" data-color="#ffffff"></div>
+          <input type="color" class="color-custom" id="bar-custom" value="#7c5cfc" title="Kies eigen kleur" />
         </div>
       </div>
 
@@ -653,6 +739,8 @@
       animFrame: null,
       beatPulse: 0,
       beatHist: [],
+      bgImage: null,
+      bgImageName: "",
     };
 
     const canvas = $("#waveform-canvas");
@@ -674,8 +762,7 @@
       const w = canvas.width / window.devicePixelRatio;
       const h = canvas.height / window.devicePixelRatio;
       ctx.clearRect(0, 0, w, h);
-      ctx.fillStyle = state.bgColor;
-      ctx.fillRect(0, 0, w, h);
+      paintBackground(ctx, w, h);
 
       ctx.strokeStyle = state.barColor + "30";
       ctx.lineWidth = 1;
@@ -810,16 +897,7 @@
     // Waveform drawing
     function drawWaveformStyle(w, h, time) {
       ctx.clearRect(0, 0, w, h);
-
-      if (state.bgMode === "gradient") {
-        const grad = ctx.createLinearGradient(0, 0, 0, h);
-        grad.addColorStop(0, state.bgColor);
-        grad.addColorStop(1, shiftColor(state.bgColor, 30));
-        ctx.fillStyle = grad;
-      } else {
-        ctx.fillStyle = state.bgColor;
-      }
-      ctx.fillRect(0, 0, w, h);
+      paintBackground(ctx, w, h);
 
       const data = state.waveformData;
       if (!data) return;
@@ -848,6 +926,18 @@
           break;
         case "neon":
           drawNeon(w, h, data, time, playedSamples, live);
+          break;
+        case "particles":
+          drawParticles(w, h, data, time, playedSamples, live);
+          break;
+        case "spiral":
+          drawSpiral(w, h, data, time, playedSamples, live);
+          break;
+        case "scope":
+          drawScope(w, h, data, time, playedSamples, live);
+          break;
+        case "flow":
+          drawFlow(w, h, data, time, playedSamples, live);
           break;
       }
     }
@@ -1062,6 +1152,247 @@
       }
     }
 
+    // ---------- Nieuwe stijlen: Particles / Spiral / Scope / Flow ----------
+    function styleBeat(freqData) {
+      const live = !!(freqData && freqData.length > 0);
+      const bands = live ? neonBands(freqData) : { bass: 0, mid: 0, high: 0, level: 0.5 };
+      const pulse = live ? updateBeat(bands.bass) : 0.3 + 0.2 * Math.sin(performance.now() / 1000 * 1.4);
+      return { live, bands, pulse };
+    }
+
+    function paintParticles(c, w, h, data, time, freqData) {
+      const { live, bands, pulse } = styleBeat(freqData);
+      const col2 = getNeonColors()[1];
+      const scale = Math.max(0.6, w / 1280);
+      const N = 130;
+      const pump = 1 + pulse * 0.7 + bands.bass * 0.4;
+      for (let i = 0; i < N; i++) {
+        const s1 = seededRand(i * 3 + 11), s2 = seededRand(i * 3 + 12), s3 = seededRand(i * 3 + 13);
+        let v;
+        if (live) v = fftLogValue(freqData, i, N, freqData.length);
+        else v = data[Math.floor((i / N) * data.length)] || 0;
+        const x = s1 * w;
+        const rise = ((time * (12 + s2 * 30) * (0.5 + bands.high) + s3 * h) % (h * 1.1));
+        const baseY = h * 0.92 - s2 * h * 0.75;
+        const y = baseY - v * h * 0.38 * pump + (h * 0.92 - rise) * 0.25 - h * 0.1;
+        const yy = Math.max(0, Math.min(h, y));
+        const r = (0.8 + v * 5.5 * pump + s3 * 1.2) * scale;
+        const col = i % 3 === 2 ? col2 : state.barColor;
+        c.save();
+        c.globalAlpha = 0.18 + v * 0.5;
+        c.fillStyle = col;
+        c.beginPath();
+        c.arc(x, yy, r * 2.2, 0, Math.PI * 2);
+        c.fill();
+        c.globalAlpha = 0.45 + v * 0.55;
+        c.beginPath();
+        c.arc(x, yy, r, 0, Math.PI * 2);
+        c.fill();
+        c.restore();
+      }
+    }
+
+    function paintSpiral(c, w, h, data, time, freqData) {
+      const { live, bands, pulse } = styleBeat(freqData);
+      const col2 = getNeonColors()[1];
+      const scale = Math.max(0.6, w / 1280);
+      const cx = w / 2, cy = h / 2;
+      const maxR = Math.min(w, h) * 0.42;
+      const turns = 3, points = 220;
+      const rot = time * (live ? 1.1 + pulse * 1.2 : 0.35);
+      const pump = 1 + pulse * 0.6 + bands.bass * 0.4;
+      const arms = [
+        { off: 0, col: state.barColor, lw: 2.4 },
+        { off: Math.PI, col: col2, lw: 2.0 },
+      ];
+      for (const arm of arms) {
+        const passes = [
+          { m: 3.2, a: 0.25, blur: 18 * scale },
+          { m: 1.3, a: 0.9, blur: 10 * scale },
+        ];
+        for (const p of passes) {
+          c.save();
+          c.globalAlpha = p.a;
+          c.strokeStyle = arm.col;
+          c.lineWidth = Math.max(1, arm.lw * scale * p.m * 0.6);
+          c.lineJoin = "round";
+          c.lineCap = "round";
+          c.shadowColor = arm.col;
+          c.shadowBlur = p.blur * (1 + pulse * 0.7);
+          c.beginPath();
+          for (let i = 0; i <= points; i++) {
+            const f = i / points;
+            const a = arm.off + rot + f * Math.PI * 2 * turns;
+            let v;
+            if (live) v = fftLogValue(freqData, i, points, freqData.length);
+            else v = data[Math.floor(f * (data.length - 1))] || 0;
+            const r = maxR * (0.12 + 0.88 * f) * (0.55 + v * 1.0 * pump);
+            const x = cx + Math.cos(a) * r;
+            const y = cy + Math.sin(a) * r * 0.62;
+            if (i === 0) c.moveTo(x, y);
+            else c.lineTo(x, y);
+          }
+          c.stroke();
+          c.restore();
+        }
+      }
+      // Pulserende kern
+      c.save();
+      const cr = (6 + pulse * 14 + bands.bass * 10) * scale;
+      const g = c.createRadialGradient(cx, cy, 0, cx, cy, cr * 3);
+      g.addColorStop(0, rgba(state.barColor, 0.8));
+      g.addColorStop(1, rgba(state.barColor, 0));
+      c.fillStyle = g;
+      c.beginPath();
+      c.arc(cx, cy, cr * 3, 0, Math.PI * 2);
+      c.fill();
+      c.restore();
+    }
+
+    function paintScope(c, w, h, data, time, freqData, timeData) {
+      const { live, bands, pulse } = styleBeat(freqData);
+      const scale = Math.max(0.6, w / 1280);
+      // Raster
+      c.save();
+      c.strokeStyle = "rgba(255,255,255,0.07)";
+      c.lineWidth = 1;
+      const stepX = w / 12, stepY = h / 8;
+      c.beginPath();
+      for (let x = stepX; x < w; x += stepX) { c.moveTo(x, 0); c.lineTo(x, h); }
+      for (let y = stepY; y < h; y += stepY) { c.moveTo(0, y); c.lineTo(w, y); }
+      c.stroke();
+      c.strokeStyle = rgba(state.barColor, 0.25);
+      c.beginPath();
+      c.moveTo(0, h / 2); c.lineTo(w, h / 2);
+      c.moveTo(w / 2, 0); c.lineTo(w / 2, h);
+      c.stroke();
+      c.restore();
+      // Trace
+      const N = Math.min(900, Math.floor(w));
+      const cy = h / 2;
+      const amp = h * 0.36 * (0.5 + bands.level * 0.7) * (1 + pulse * 0.35);
+      const trace = () => {
+        c.beginPath();
+        for (let i = 0; i <= N; i++) {
+          const x = (i / N) * w;
+          let v;
+          if (live && timeData && timeData.length > 0) {
+            v = ((timeData[Math.floor((i / N) * timeData.length)] || 128) - 128) / 128;
+          } else {
+            const idx = Math.floor((i / N) * (data.length - 1));
+            v = ((data[idx] || 0) - 0.5) * 2 * Math.sin((i / N) * Math.PI);
+          }
+          const y = cy + v * amp;
+          if (i === 0) c.moveTo(x, y);
+          else c.lineTo(x, y);
+        }
+      };
+      c.save();
+      c.lineJoin = "round";
+      c.globalAlpha = 0.3;
+      c.strokeStyle = state.barColor;
+      c.lineWidth = Math.max(2, 7 * scale);
+      c.shadowColor = state.barColor;
+      c.shadowBlur = 22 * scale * (1 + pulse * 0.6);
+      trace(); c.stroke();
+      c.globalAlpha = 0.95;
+      c.lineWidth = Math.max(1.2, 2.2 * scale);
+      c.shadowBlur = 10 * scale;
+      trace(); c.stroke();
+      c.globalAlpha = 0.9;
+      c.strokeStyle = "rgba(255,255,255,0.85)";
+      c.lineWidth = Math.max(1, scale);
+      c.shadowBlur = 0;
+      trace(); c.stroke();
+      c.restore();
+      // Scanlines
+      c.save();
+      c.fillStyle = "rgba(0,0,0,0.10)";
+      for (let y = 0; y < h; y += Math.max(3, Math.floor(4 * scale))) c.fillRect(0, y, w, 1);
+      c.restore();
+    }
+
+    function paintFlow(c, w, h, data, time, freqData, timeData) {
+      const { live, bands, pulse } = styleBeat(freqData);
+      const scale = Math.max(0.6, w / 1280);
+      const N = Math.min(720, Math.floor(w / 2));
+      const cy = h / 2;
+      const pump = 1 + pulse * 0.7 + bands.bass * 0.4;
+      const amp = h * 0.30 * (0.45 + bands.level * 0.8) * pump;
+      const ys = [];
+      for (let i = 0; i <= N; i++) {
+        const x = (i / N) * w;
+        const nx = i / N;
+        let v;
+        if (live && timeData && timeData.length > 0) {
+          v = ((timeData[Math.floor(nx * timeData.length)] || 128) - 128) / 128;
+        } else {
+          v = (((data[Math.floor(nx * (data.length - 1))] || 0)) - 0.5) * 2;
+        }
+        const wob = Math.sin(nx * 9 + time * (live ? 2.2 : 1.0)) * 0.25;
+        ys.push(cy + (v * 0.8 + wob) * amp * (0.25 + 0.75 * Math.sin(Math.PI * nx)));
+      }
+      const xs = (i) => (i / N) * w;
+      // Vulling met verticaal verloop
+      c.save();
+      const g = c.createLinearGradient(0, cy - amp, 0, cy + amp);
+      g.addColorStop(0, rgba(state.barColor, 0.02));
+      g.addColorStop(0.5, rgba(state.barColor, 0.55 + Math.min(0.3, pulse * 0.3)));
+      g.addColorStop(1, rgba(state.barColor, 0.02));
+      c.fillStyle = g;
+      c.shadowColor = state.barColor;
+      c.shadowBlur = 24 * scale * (1 + pulse * 0.6);
+      c.beginPath();
+      c.moveTo(xs(0), cy);
+      for (let i = 0; i <= N; i++) c.lineTo(xs(i), ys[i]);
+      c.lineTo(xs(N), cy);
+      c.closePath();
+      c.fill();
+      c.restore();
+      // Heldere bovenlijn
+      c.save();
+      c.strokeStyle = state.barColor;
+      c.lineWidth = Math.max(1.5, 2.4 * scale);
+      c.lineJoin = "round";
+      c.shadowColor = state.barColor;
+      c.shadowBlur = 14 * scale * (1 + pulse * 0.6);
+      c.beginPath();
+      c.moveTo(xs(0), ys[0]);
+      for (let i = 1; i <= N; i++) c.lineTo(xs(i), ys[i]);
+      c.stroke();
+      c.globalAlpha = 0.85;
+      c.strokeStyle = "rgba(255,255,255,0.8)";
+      c.lineWidth = Math.max(1, scale * 0.8);
+      c.shadowBlur = 0;
+      c.stroke();
+      c.restore();
+    }
+
+    function drawParticles(w, h, data, time, played, live) {
+      paintParticles(ctx, w, h, data, time, live ? state.freqData : null);
+    }
+    function drawSpiral(w, h, data, time, played, live) {
+      paintSpiral(ctx, w, h, data, time, live ? state.freqData : null);
+    }
+    function drawScope(w, h, data, time, played, live) {
+      paintScope(ctx, w, h, data, time, live ? state.freqData : null, live ? state.timeData : null);
+    }
+    function drawFlow(w, h, data, time, played, live) {
+      paintFlow(ctx, w, h, data, time, live ? state.freqData : null, live ? state.timeData : null);
+    }
+    function drawParticlesCtx(c, w, h, data, time, hasLive, freqData) {
+      paintParticles(c, w, h, data, time, hasLive ? freqData : null);
+    }
+    function drawSpiralCtx(c, w, h, data, time, hasLive, freqData) {
+      paintSpiral(c, w, h, data, time, hasLive ? freqData : null);
+    }
+    function drawScopeCtx(c, w, h, data, time, hasLive, freqData, timeData) {
+      paintScope(c, w, h, data, time, hasLive ? freqData : null, hasLive ? timeData : null);
+    }
+    function drawFlowCtx(c, w, h, data, time, hasLive, freqData, timeData) {
+      paintFlow(c, w, h, data, time, hasLive ? freqData : null, hasLive ? timeData : null);
+    }
+
     function drawNeon(w, h, data, time, played, live) {
       drawNeonWaves(ctx, w, h, data, time, live ? state.freqData : null, live ? state.timeData : null);
     }
@@ -1271,6 +1602,12 @@
       // Bijna zwarte achtergrond met subtiele paars/blauwe tint in het midden
       c.fillStyle = "#030309";
       c.fillRect(0, 0, w, h);
+      if (bgImageReady()) {
+        c.save();
+        c.globalAlpha = 0.4;
+        drawCoverImage(c, state.bgImage, w, h);
+        c.restore();
+      }
       const bgGrad = c.createRadialGradient(w / 2, h * 0.45, Math.min(w, h) * 0.05, w / 2, h * 0.5, Math.max(w, h) * 0.7);
       bgGrad.addColorStop(0, "rgba(40,30,80,0.35)");
       bgGrad.addColorStop(0.5, "rgba(10,20,40,0.18)");
@@ -1434,6 +1771,48 @@
       ctx.closePath();
     }
 
+    function hexToRgb(hex) {
+      let h = String(hex || "").replace("#", "");
+      if (h.length === 3) h = h.split("").map((x) => x + x).join("");
+      const n = parseInt(h, 16);
+      if (isNaN(n) || h.length !== 6) return [124, 92, 252];
+      return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+    }
+
+    function rgba(hex, a) {
+      const [r, g, b] = hexToRgb(hex);
+      return `rgba(${r},${g},${b},${a})`;
+    }
+
+    function drawCoverImage(c, img, w, h) {
+      const ir = img.naturalWidth / img.naturalHeight, cr = w / h;
+      let dw, dh;
+      if (ir > cr) { dh = h; dw = h * ir; } else { dw = w; dh = w / ir; }
+      c.drawImage(img, (w - dw) / 2, (h - dh) / 2, dw, dh);
+    }
+
+    function bgImageReady() {
+      return state.bgMode === "image" && state.bgImage && state.bgImage.complete && state.bgImage.naturalWidth > 0;
+    }
+
+    function paintBackground(c, w, h) {
+      if (bgImageReady()) {
+        drawCoverImage(c, state.bgImage, w, h);
+        c.fillStyle = "rgba(0,0,0,0.55)";
+        c.fillRect(0, 0, w, h);
+        return;
+      }
+      if (state.bgMode === "gradient") {
+        const grad = c.createLinearGradient(0, 0, 0, h);
+        grad.addColorStop(0, state.bgColor);
+        grad.addColorStop(1, shiftColor(state.bgColor, 30));
+        c.fillStyle = grad;
+      } else {
+        c.fillStyle = state.bgColor;
+      }
+      c.fillRect(0, 0, w, h);
+    }
+
     function shiftColor(hex, amount) {
       hex = hex.replace("#", "");
       let r = parseInt(hex.substring(0, 2), 16);
@@ -1557,6 +1936,7 @@
         btn.classList.add("selected");
         state.waveformStyle = btn.dataset.style;
         if (state.waveformData) drawPreviewFrame();
+        saveSettings();
       });
     });
 
@@ -1566,8 +1946,10 @@
         $$("#bg-colors .color-swatch").forEach((x) => x.classList.remove("selected"));
         s.classList.add("selected");
         state.bgColor = s.dataset.color;
+        $("#bg-custom").value = s.dataset.color;
         drawIdle();
         if (state.waveformData) drawPreviewFrame();
+        saveSettings();
       });
     });
 
@@ -1576,21 +1958,118 @@
         $$("#bar-colors .color-swatch").forEach((x) => x.classList.remove("selected"));
         s.classList.add("selected");
         state.barColor = s.dataset.color;
+        $("#bar-custom").value = s.dataset.color;
         if (state.waveformData) drawPreviewFrame();
+        saveSettings();
       });
     });
+
+    // Eigen kleur via color-picker
+    $("#bg-custom").addEventListener("input", (e) => {
+      $$("#bg-colors .color-swatch").forEach((x) => x.classList.remove("selected"));
+      state.bgColor = e.target.value;
+      drawIdle();
+      if (state.waveformData) drawPreviewFrame();
+      saveSettings();
+    });
+
+    $("#bar-custom").addEventListener("input", (e) => {
+      $$("#bar-colors .color-swatch").forEach((x) => x.classList.remove("selected"));
+      state.barColor = e.target.value;
+      if (state.waveformData) drawPreviewFrame();
+      saveSettings();
+    });
+
+    // Achtergrondmodus + afbeelding
+    $("#bg-mode").addEventListener("change", (e) => {
+      state.bgMode = e.target.value;
+      $("#bg-image-row").style.display = state.bgMode === "image" ? "flex" : "none";
+      drawIdle();
+      if (state.waveformData) drawPreviewFrame();
+      saveSettings();
+    });
+
+    $("#bg-image-btn").addEventListener("click", () => $("#bg-image-input").click());
+
+    $("#bg-image-input").addEventListener("change", (e) => {
+      const file = e.target.files && e.target.files[0];
+      if (!file) return;
+      const url = URL.createObjectURL(file);
+      const img = new Image();
+      img.onload = () => {
+        state.bgImage = img;
+        state.bgImageName = file.name;
+        $("#bg-image-btn").textContent = file.name;
+        drawIdle();
+        if (state.waveformData) drawPreviewFrame();
+      };
+      img.src = url;
+    });
+
+    // Instellingen onthouden
+    function saveSettings() {
+      try {
+        localStorage.setItem("wavy.settings", JSON.stringify({
+          waveformStyle: state.waveformStyle,
+          bgColor: state.bgColor,
+          barColor: state.barColor,
+          barWidth: state.barWidth,
+          barGap: state.barGap,
+          smoothing: state.smoothing,
+          resolution: state.resolution,
+          exportFormat: state.exportFormat,
+          bgMode: state.bgMode === "image" ? "solid" : state.bgMode,
+        }));
+      } catch (e) {}
+    }
+
+    function loadSettings() {
+      let s = null;
+      try { s = JSON.parse(localStorage.getItem("wavy.settings") || "null"); } catch (e) {}
+      if (!s) return;
+      if (s.waveformStyle) {
+        state.waveformStyle = s.waveformStyle;
+        $$(".waveform-option").forEach((b) => b.classList.toggle("selected", b.dataset.style === s.waveformStyle));
+      }
+      if (s.bgColor) {
+        state.bgColor = s.bgColor;
+        $("#bg-custom").value = s.bgColor;
+        $$("#bg-colors .color-swatch").forEach((x) => x.classList.toggle("selected", x.dataset.color === s.bgColor));
+      }
+      if (s.barColor) {
+        state.barColor = s.barColor;
+        $("#bar-custom").value = s.barColor;
+        $$("#bar-colors .color-swatch").forEach((x) => x.classList.toggle("selected", x.dataset.color === s.barColor));
+      }
+      if (s.barWidth) { state.barWidth = s.barWidth; $("#bar-width").value = s.barWidth; $("#bar-width-val").textContent = s.barWidth; }
+      if (s.barGap) { state.barGap = s.barGap; $("#bar-gap").value = s.barGap; $("#bar-gap-val").textContent = s.barGap; }
+      if (s.smoothing != null) {
+        state.smoothing = s.smoothing;
+        $("#smoothing").value = Math.round(s.smoothing * 100);
+        $("#smoothing-val").textContent = Number(s.smoothing).toFixed(2);
+      }
+      if (s.resolution) { state.resolution = s.resolution; $("#resolution").value = String(s.resolution); }
+      if (s.exportFormat) { state.exportFormat = s.exportFormat; $("#export-format").value = s.exportFormat; }
+      if (s.bgMode) {
+        state.bgMode = s.bgMode;
+        $("#bg-mode").value = s.bgMode;
+        $("#bg-image-row").style.display = s.bgMode === "image" ? "flex" : "none";
+      }
+    }
 
     // Sliders
     $("#bar-width").addEventListener("input", (e) => {
       state.barWidth = +e.target.value;
       $("#bar-width-val").textContent = e.target.value;
       if (state.waveformData) drawPreviewFrame();
+      saveSettings();
     });
 
     $("#bar-gap").addEventListener("input", (e) => {
       state.barGap = +e.target.value;
       $("#bar-gap-val").textContent = e.target.value;
       if (state.waveformData) drawPreviewFrame();
+      saveSettings();
     });
 
     $("#smoothing").addEventListener("input", (e) => {
@@ -1598,14 +2077,17 @@
       $("#smoothing-val").textContent = (e.target.value / 100).toFixed(2);
       if (state.analyserNode) state.analyserNode.smoothingTimeConstant = state.smoothing;
       if (state.waveformData) drawPreviewFrame();
+      saveSettings();
     });
 
     $("#resolution").addEventListener("change", (e) => {
       state.resolution = +e.target.value;
+      saveSettings();
     });
 
     $("#export-format").addEventListener("change", (e) => {
       state.exportFormat = e.target.value;
+      saveSettings();
     });
 
     // Export to video using canvas captureStream + MediaRecorder
@@ -1732,16 +2214,7 @@
         }
 
         offCtx.clearRect(0, 0, exportW, exportH);
-
-        if (state.bgMode === "gradient") {
-          const grad = offCtx.createLinearGradient(0, 0, 0, exportH);
-          grad.addColorStop(0, state.bgColor);
-          grad.addColorStop(1, shiftColor(state.bgColor, 30));
-          offCtx.fillStyle = grad;
-        } else {
-          offCtx.fillStyle = state.bgColor;
-        }
-        offCtx.fillRect(0, 0, exportW, exportH);
+        paintBackground(offCtx, exportW, exportH);
 
         const data = state.waveformData;
         if (data) {
@@ -1783,6 +2256,18 @@
           break;
         case "neon":
           drawNeonCtx(targetCtx, w, h, data, time, hasLive, freqData, timeData);
+          break;
+        case "particles":
+          drawParticlesCtx(targetCtx, w, h, data, time, hasLive, freqData, timeData);
+          break;
+        case "spiral":
+          drawSpiralCtx(targetCtx, w, h, data, time, hasLive, freqData, timeData);
+          break;
+        case "scope":
+          drawScopeCtx(targetCtx, w, h, data, time, hasLive, freqData, timeData);
+          break;
+        case "flow":
+          drawFlowCtx(targetCtx, w, h, data, time, hasLive, freqData, timeData);
           break;
       }
     }
@@ -2130,12 +2615,131 @@
       c.restore();
     }
 
+    function drawPreviewParticles() {
+      const el = document.getElementById("preview-particles");
+      if (!el) return;
+      const c = el.getContext("2d");
+      const w = 64, h = 44;
+      c.clearRect(0, 0, w, h);
+      c.fillStyle = "#0a0a0f";
+      c.fillRect(0, 0, w, h);
+      for (let i = 0; i < 40; i++) {
+        const v = seededRand(i * 3 + 12);
+        c.globalAlpha = 0.3 + v * 0.7;
+        c.fillStyle = i % 3 === 2 ? "#22e6ff" : "#7c5cfc";
+        c.beginPath();
+        c.arc(seededRand(i * 3 + 11) * w, h * 0.9 - seededRand(i * 3 + 13) * h * 0.7 - v * 8, 0.8 + v * 2.4, 0, Math.PI * 2);
+        c.fill();
+      }
+      c.globalAlpha = 1;
+    }
+
+    function drawPreviewSpiral() {
+      const el = document.getElementById("preview-spiral");
+      if (!el) return;
+      const c = el.getContext("2d");
+      const w = 64, h = 44;
+      c.clearRect(0, 0, w, h);
+      c.fillStyle = "#0a0a0f";
+      c.fillRect(0, 0, w, h);
+      const cx = w / 2, cy = h / 2;
+      for (const [off, col] of [[0, "#7c5cfc"], [Math.PI, "#22e6ff"]]) {
+        c.save();
+        c.strokeStyle = col;
+        c.lineWidth = 1.4;
+        c.shadowColor = col;
+        c.shadowBlur = 4;
+        c.beginPath();
+        for (let i = 0; i <= 90; i++) {
+          const f = i / 90;
+          const a = off + f * Math.PI * 6;
+          const v = 0.5 + 0.5 * Math.sin(i * 0.4);
+          const r = 16 * f * (0.6 + v * 0.7);
+          const x = cx + Math.cos(a) * r;
+          const y = cy + Math.sin(a) * r * 0.62;
+          if (i === 0) c.moveTo(x, y);
+          else c.lineTo(x, y);
+        }
+        c.stroke();
+        c.restore();
+      }
+    }
+
+    function drawPreviewScope() {
+      const el = document.getElementById("preview-scope");
+      if (!el) return;
+      const c = el.getContext("2d");
+      const w = 64, h = 44;
+      c.clearRect(0, 0, w, h);
+      c.fillStyle = "#061206";
+      c.fillRect(0, 0, w, h);
+      c.strokeStyle = "rgba(255,255,255,0.12)";
+      c.lineWidth = 1;
+      c.beginPath();
+      c.moveTo(0, h / 2); c.lineTo(w, h / 2);
+      c.moveTo(w / 2, 0); c.lineTo(w / 2, h);
+      c.stroke();
+      c.save();
+      c.strokeStyle = "#5cfc9c";
+      c.lineWidth = 1.6;
+      c.shadowColor = "#5cfc9c";
+      c.shadowBlur = 5;
+      c.beginPath();
+      for (let x = 0; x <= w; x++) {
+        const y = h / 2 + Math.sin(x * 0.35) * 8 * Math.sin(Math.PI * x / w) + Math.sin(x * 0.9) * 3;
+        if (x === 0) c.moveTo(x, y);
+        else c.lineTo(x, y);
+      }
+      c.stroke();
+      c.restore();
+    }
+
+    function drawPreviewFlow() {
+      const el = document.getElementById("preview-flow");
+      if (!el) return;
+      const c = el.getContext("2d");
+      const w = 64, h = 44;
+      c.clearRect(0, 0, w, h);
+      c.fillStyle = "#0a0a0f";
+      c.fillRect(0, 0, w, h);
+      const g = c.createLinearGradient(0, 6, 0, h - 6);
+      g.addColorStop(0, "rgba(124,92,252,0.05)");
+      g.addColorStop(0.5, "rgba(124,92,252,0.7)");
+      g.addColorStop(1, "rgba(124,92,252,0.05)");
+      c.fillStyle = g;
+      c.beginPath();
+      c.moveTo(0, h / 2);
+      for (let x = 0; x <= w; x++) {
+        c.lineTo(x, h / 2 + Math.sin(x * 0.25) * 10 * Math.sin(Math.PI * x / w));
+      }
+      c.lineTo(w, h / 2);
+      c.closePath();
+      c.fill();
+      c.strokeStyle = "#7c5cfc";
+      c.lineWidth = 1.6;
+      c.shadowColor = "#7c5cfc";
+      c.shadowBlur = 4;
+      c.beginPath();
+      for (let x = 0; x <= w; x++) {
+        const y = h / 2 + Math.sin(x * 0.25) * 10 * Math.sin(Math.PI * x / w);
+        if (x === 0) c.moveTo(x, y);
+        else c.lineTo(x, y);
+      }
+      c.stroke();
+    }
+
     drawPreviewBars();
     drawPreviewWave();
     drawPreviewMirror();
     drawPreviewCircle();
     drawPreviewSpectrum();
     drawPreviewNeon();
+    drawPreviewParticles();
+    drawPreviewSpiral();
+    drawPreviewScope();
+    drawPreviewFlow();
+    loadSettings();
+    drawIdle();
   </script>
 </body>
 </html>
