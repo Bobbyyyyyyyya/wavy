@@ -1,0 +1,20 @@
+{
+  "name": "wavy",
+  "version": "1.0.0",
+  "description": "Convert audio files to waveform videos",
+  "main": "main.js",
+  "scripts": {
+    "dev": "electron .",
+    "start": "electron .",
+    "build": "electron-builder"
+  },
+  "dependencies": {
+    "electron": "^43.1.1"
+  },
+  "devDependencies": {
+    "electron-builder": "^24.0.0"
+  },
+  "allowScripts": {
+    "electron@28.3.3": true
+  }
+}
