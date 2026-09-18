@@ -421,6 +421,45 @@
       transform: scale(1.05);
     }
 
+    .skip-btn {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      background: var(--surface-hover);
+      border: 1px solid var(--border);
+      color: var(--text);
+      font-size: 15px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: border-color 0.15s, transform 0.15s;
+    }
+
+    .skip-btn:hover {
+      border-color: var(--accent);
+      transform: scale(1.05);
+    }
+
+    .speed-btn {
+      min-width: 44px;
+      height: 28px;
+      border-radius: 14px;
+      background: var(--surface-hover);
+      border: 1px solid var(--border);
+      color: var(--accent);
+      font-size: 12px;
+      font-weight: 700;
+      font-family: "SF Mono", "Menlo", monospace;
+      cursor: pointer;
+      padding: 0 10px;
+      transition: border-color 0.15s;
+    }
+
+    .speed-btn:hover {
+      border-color: var(--accent);
+    }
+
     .time-display {
       font-size: 13px;
       color: var(--text-dim);
@@ -694,7 +733,10 @@
       </div>
 
       <div class="playback-controls" id="playback-controls" style="display:none">
+        <button class="skip-btn" id="skip-back" title="10 seconden terug">⏪</button>
         <button class="play-btn" id="play-btn">▶</button>
+        <button class="skip-btn" id="skip-fwd" title="10 seconden vooruit">⏩</button>
+        <button class="speed-btn" id="speed-btn" title="Afspeelsnelheid">1×</button>
         <span class="time-display" id="time-current">0:00</span>
         <div class="progress-bar" id="progress-bar">
           <div class="progress-fill" id="progress-fill"></div>
@@ -744,6 +786,7 @@
       bgMode: "solid",
       waveformData: null,
       animFrame: null,
+      playbackRate: 1,
       beatPulse: 0,
       beatHist: [],
       particleFlow: 1,
@@ -1971,6 +2014,19 @@
       }
     });
 
+    const SPEEDS = [0.5, 0.75, 1, 1.25, 1.5, 2];
+
+    function currentPosition() {
+      if (!state.audioBuffer) return 0;
+      if (state.isPlaying && state.audioContext) {
+        return Math.min(
+          state.audioBuffer.duration,
+          (state.audioContext.currentTime - state.startTime) * state.playbackRate
+        );
+      }
+      return state.pauseTime || 0;
+    }
+
     async function startPlayback() {
       if (!state.audioBuffer || !state.audioContext) return;
 
@@ -1980,10 +2036,11 @@
 
       state.sourceNode = state.audioContext.createBufferSource();
       state.sourceNode.buffer = state.audioBuffer;
+      state.sourceNode.playbackRate.value = state.playbackRate;
       state.sourceNode.connect(state.analyserNode);
       state.analyserNode.connect(state.audioContext.destination);
       state.sourceNode.start(0, state.pauseTime);
-      state.startTime = state.audioContext.currentTime - state.pauseTime;
+      state.startTime = state.audioContext.currentTime - state.pauseTime / state.playbackRate;
       state.isPlaying = true;
       playBtn.textContent = "⏸";
 
@@ -2004,22 +2061,49 @@
         state.sourceNode.onended = null;
         try { state.sourceNode.stop(); } catch (e) {}
       }
-      if (state.audioContext) state.pauseTime = state.audioContext.currentTime - state.startTime;
+      state.pauseTime = currentPosition();
       state.isPlaying = false;
       playBtn.textContent = "▶";
       if (state.animFrame) cancelAnimationFrame(state.animFrame);
       ensureNeonIdle();
     }
 
+    function seekTo(t) {
+      if (!state.audioBuffer) return;
+      t = Math.max(0, Math.min(state.audioBuffer.duration, t));
+      const wasPlaying = state.isPlaying;
+      if (wasPlaying) stopPlayback();
+      state.pauseTime = t;
+      updateProgressUI(t);
+      drawPreviewFrame();
+      if (wasPlaying) startPlayback();
+    }
+
+    function setRate(r) {
+      state.playbackRate = r;
+      $("#speed-btn").textContent = String(r).replace(".", ",") + "×";
+      if (state.isPlaying) {
+        const pos = currentPosition();
+        stopPlayback();
+        state.pauseTime = pos;
+        startPlayback();
+      }
+    }
+
+    function updateProgressUI(t) {
+      const dur = state.audioBuffer ? state.audioBuffer.duration : 0;
+      $("#time-current").textContent = formatTime(t);
+      $("#progress-fill").style.width = (dur > 0 ? (t / dur) * 100 : 0) + "%";
+    }
+
     function animatePlayback() {
       if (!state.isPlaying) return;
 
-      const elapsed = state.audioContext.currentTime - state.startTime;
+      const elapsed = currentPosition();
       const dur = state.audioBuffer.duration;
       const pct = Math.min(elapsed / dur, 1);
 
-      $("#time-current").textContent = formatTime(elapsed);
-      $("#progress-fill").style.width = pct * 100 + "%";
+      updateProgressUI(elapsed);
 
       // Read live frequency data from analyser
       if (state.analyserNode) {
@@ -2039,10 +2123,7 @@
     function drawPreviewFrame() {
       const w = canvas.width / window.devicePixelRatio;
       const h = canvas.height / window.devicePixelRatio;
-      const time = state.isPlaying
-        ? state.audioContext.currentTime - state.startTime
-        : state.pauseTime || 0;
-      drawWaveformStyle(w, h, time);
+      drawWaveformStyle(w, h, currentPosition());
       ensureNeonIdle();
     }
 
@@ -2050,13 +2131,15 @@
     $("#progress-bar").addEventListener("click", (e) => {
       const rect = e.currentTarget.getBoundingClientRect();
       const pct = (e.clientX - rect.left) / rect.width;
-      const newTime = pct * (state.audioBuffer?.duration || 0);
+      seekTo(pct * (state.audioBuffer?.duration || 0));
+    });
 
-      if (state.isPlaying) stopPlayback();
-      state.pauseTime = newTime;
-      drawPreviewFrame();
-      $("#time-current").textContent = formatTime(newTime);
-      $("#progress-fill").style.width = pct * 100 + "%";
+    // Skippen + snelheid
+    $("#skip-back").addEventListener("click", () => seekTo(currentPosition() - 10));
+    $("#skip-fwd").addEventListener("click", () => seekTo(currentPosition() + 10));
+    $("#speed-btn").addEventListener("click", () => {
+      const i = SPEEDS.indexOf(state.playbackRate);
+      setRate(SPEEDS[(i + 1) % SPEEDS.length]);
     });
 
     // Waveform style selection
