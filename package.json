@@ -16,5 +16,19 @@
   },
   "allowScripts": {
     "electron@28.3.3": true
+  },
+  "build": {
+    "appId": "com.wavy.app",
+    "productName": "Wavy",
+    "files": [
+      "index.html",
+      "main.js",
+      "preload.js",
+      "package.json"
+    ],
+    "mac": {
+      "category": "public.app-category.music",
+      "target": ["dmg", "zip"]
+    }
   }
 }
