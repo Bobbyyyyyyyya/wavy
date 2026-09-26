@@ -1,34 +1,14 @@
-// electron-builder afterPack-hook: strip ALLE (deel)signaturen uit de .app,
-// zodat Gatekeeper een ongesigneerde app als zodanig beoordeelt
-// ("kan niet scannen op malware", te omzeilen) i.p.v. "beschadigd".
+// electron-builder afterPack-hook: zet een verse AD-HOC signatuur over de
+// hele bundel (met behoud van entitlements).
+//
+// Waarom: electron-builder past de bundel aan NA Electrons originele
+// signing, waardoor geneste seals breken -> Gatekeeper zegt "beschadigd".
+// Volledig strippen is geen optie (kernel killt de app bij launch).
+// Een geldige ad-hoc seal vertrouwt Gatekeeper niet, maar toont wel de
+// omzeilbare "kan niet scannen op malware"-melding i.p.v. "beschadigd".
 const { execFileSync } = require("child_process");
 const fs = require("fs");
 const path = require("path");
-
-function walk(dir, out = []) {
-  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-    const p = path.join(dir, entry.name);
-    if (entry.isDirectory()) {
-      if (entry.name === "_CodeSignature") {
-        fs.rmSync(p, { recursive: true, force: true });
-        continue;
-      }
-      walk(p, out);
-    } else {
-      out.push(p);
-    }
-  }
-  return out;
-}
-
-function isSigned(file) {
-  try {
-    execFileSync("codesign", ["-d", file], { stdio: "ignore" });
-    return true;
-  } catch {
-    return false;
-  }
-}
 
 exports.default = async function afterPack(context) {
   const appDir = context.appOutDir;
@@ -38,21 +18,17 @@ exports.default = async function afterPack(context) {
     .map((f) => path.join(appDir, f));
 
   for (const app of apps) {
-    for (const file of walk(app)) {
-      if (isSigned(file)) {
-        execFileSync("codesign", ["--remove-signature", file]);
-      }
-    }
-    // Eerst alle _CodeSignature-mappen weg (ook in geneste .app's/frameworks),
-    // daarna per bestand een eventuele losse signatuur verwijderen.
-    try {
-      execFileSync("find", [app, "-name", "_CodeSignature", "-exec", "rm", "-rf", "{}", "+"]);
-    } catch {}
-    for (const file of walk(app)) {
-      if (isSigned(file)) {
-        execFileSync("codesign", ["--remove-signature", file]);
-      }
-    }
-    console.log(`[afterPack] signatures stripped from ${app}`);
+    execFileSync("codesign", [
+      "--sign", "-",
+      "--force",
+      "--deep",
+      "--preserve-metadata=entitlements",
+      app,
+    ]);
+    const out = execFileSync("codesign", ["--verify", "--deep", "--strict", "--verbose=1", app], {
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "pipe"],
+    }).trim();
+    console.log(`[afterPack] ad-hoc re-signed ${app}: ${out.split("\n").pop()}`);
   }
 };

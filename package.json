@@ -1,6 +1,6 @@
 {
   "name": "wavy",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "Convert audio files to waveform videos",
   "main": "main.js",
   "scripts": {
@@ -29,7 +29,10 @@
       "category": "public.app-category.music",
       "icon": "assets/icon.icns",
       "identity": null,
-      "target": ["dmg", "zip"]
+      "target": [
+        "dmg",
+        "zip"
+      ]
     }
   }
 }
