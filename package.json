@@ -1,6 +1,6 @@
 {
   "name": "wavy",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Convert audio files to waveform videos",
   "main": "main.js",
   "scripts": {
@@ -18,6 +18,7 @@
   "build": {
     "appId": "com.wavy.app",
     "productName": "Wavy",
+    "afterPack": "./scripts/after-pack.js",
     "files": [
       "index.html",
       "main.js",
@@ -26,6 +27,7 @@
     ],
     "mac": {
       "category": "public.app-category.music",
+      "icon": "assets/icon.icns",
       "identity": null,
       "target": ["dmg", "zip"]
     }
