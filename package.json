@@ -1,6 +1,6 @@
 {
   "name": "wavy",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "Convert audio files to waveform videos",
   "author": "Wavy",
   "main": "main.js",
@@ -38,12 +38,17 @@
     "win": {
       "icon": "assets/icon.ico",
       "signAndEditExecutable": false,
-      "target": ["zip"]
+      "target": [
+        "zip"
+      ]
     },
     "linux": {
       "category": "AudioVideo",
       "icon": "assets/icon-512.png",
-      "target": ["zip", "tar.gz"]
+      "target": [
+        "zip",
+        "tar.gz"
+      ]
     }
   }
 }
