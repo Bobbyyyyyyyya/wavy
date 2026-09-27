@@ -42,13 +42,14 @@
         "zip"
       ]
     },
-    "linux": {
-      "category": "AudioVideo",
-      "icon": "assets/icon-512.png",
-      "target": [
-        "zip",
-        "tar.gz"
-      ]
-    }
+ "linux": {
+  "category": "AudioVideo",
+  "maintainer": "Wavy",
+  "icon": "assets/icon-512.png",
+  "target": [
+   "zip",
+   "tar.gz"
+  ]
+ }
   }
 }
