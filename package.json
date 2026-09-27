@@ -2,6 +2,7 @@
   "name": "wavy",
   "version": "1.0.3",
   "description": "Convert audio files to waveform videos",
+  "author": "Wavy",
   "main": "main.js",
   "scripts": {
     "dev": "electron .",
