@@ -33,6 +33,16 @@
         "dmg",
         "zip"
       ]
+    },
+    "win": {
+      "icon": "assets/icon.ico",
+      "signAndEditExecutable": false,
+      "target": ["zip"]
+    },
+    "linux": {
+      "category": "AudioVideo",
+      "icon": "assets/icon-512.png",
+      "target": ["zip", "tar.gz"]
     }
   }
 }
